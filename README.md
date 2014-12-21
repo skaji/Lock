@@ -8,13 +8,15 @@ Lock - do something with file lock
 
     my $lock = Lock->new(".lock");
 
-    $lock->shared(sub {
+    {
+        my $guard = $lock->shared;
         print "do something with shared lock\n";
-    });
+    }
 
-    $lock->exclusive(sub {
+    {
+        my $guard = $lock->exclusive;
         print "do something with exclusive lock\n";
-    });
+    }
 
 # DESCRIPTION
 

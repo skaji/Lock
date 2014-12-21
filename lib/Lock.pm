@@ -7,39 +7,35 @@ use Carp 'croak';
 
 our $VERSION = "0.01";
 
+{
+    package Lock::Guard;
+    sub new { bless $_[1], $_[0] }
+    sub DESTROY { $_[0]->() }
+}
+
 sub new {
     my ($class, $file) = @_;
-    open my $fh, ">>", $file or croak "open $file: $!";
-    bless { fh => $fh, file => $file, pid => $$ }, $class;
+    my $self = bless { file => $file }, $class;
+    $self->_reopen;
 }
 
 sub _reopen {
     my $self = shift;
-    {
-        my $fh = $self->{fh};
-        close $fh;
-        undef $fh;
+    if (my $fh = delete $self->{fh}) {
+        close $self->{fh};
     }
     open my $fh, ">>", $self->{file} or croak "open $self->{file}: $!";
     $self->{fh} = $fh;
+    $self->{pid} = $$;
+    $self;
 }
 
 sub _lock {
     my ($self, $kind, $cb) = @_;
     $self->_reopen if $self->{pid} != $$;
-    my $wantarray = wantarray;
-    my @return;
     my $fh = $self->{fh};
     flock $fh, $kind or croak "flock $self->{file}: $!";
-    local $@;
-    if ($wantarray) {
-        @return = eval { $cb->() };
-    } else {
-        $return[0] = eval { $cb->() };
-    }
-    flock $fh, LOCK_UN;
-    die "$@\n" if $@;
-    $wantarray ? @return : $return[0];
+    Lock::Guard->new(sub { flock $fh, LOCK_UN });
 }
 
 sub exclusive {
@@ -67,13 +63,15 @@ Lock - do something with file lock
 
     my $lock = Lock->new(".lock");
 
-    $lock->shared(sub {
+    {
+        my $guard = $lock->shared;
         print "do something with shared lock\n";
-    });
+    }
 
-    $lock->exclusive(sub {
+    {
+        my $guard = $lock->exclusive;
         print "do something with exclusive lock\n";
-    });
+    }
 
 =head1 DESCRIPTION
 
