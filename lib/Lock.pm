@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Fcntl qw(:flock);
 use Carp 'croak';
+use Sys::SigAction qw(timeout_call);
 
 our $VERSION = "0.01";
 
@@ -29,21 +30,33 @@ sub _reopen {
 }
 
 sub _lock {
-    my ($self, $kind, $cb) = @_;
+    my ($self, $kind, $timeout_second) = @_;
     $self->_reopen if $self->{pid} != $$;
     my $fh = $self->{fh};
-    flock $fh, $kind or croak "flock $self->{file}: $!";
-    Lock::Guard->new(sub { flock $fh, LOCK_UN });
+    my $is_timeout;
+    if ($timeout_second) {
+        $is_timeout = timeout_call $timeout_second, sub {
+            flock $fh, $kind or croak "flock $self->{file}: $!";
+        };
+    } else {
+        flock $fh, $kind or croak "flock $self->{file}: $!";
+    }
+
+    if ($timeout_second && $is_timeout) {
+        return;
+    } else {
+        Lock::Guard->new(sub { flock $fh, LOCK_UN });
+    }
 }
 
 sub exclusive {
-    my ($self, $cb) = @_;
-    $self->_lock(LOCK_EX, $cb);
+    my ($self, $timeout_second) = @_;
+    $self->_lock(LOCK_EX, $timeout_second);
 }
 
 sub shared {
-    my ($self, $cb) = @_;
-    $self->_lock(LOCK_SH, $cb);
+    my ($self, $timeout_second) = @_;
+    $self->_lock(LOCK_SH, $timeout_second);
 }
 
 1;
@@ -65,10 +78,14 @@ Lock - do something with file lock
         my $guard = $lock->shared;
         print "do something with shared lock\n";
     }
-
     {
         my $guard = $lock->exclusive;
         print "do something with exclusive lock\n";
+    }
+    {
+        # with timeout 5sec
+        my $guard = $lock->shared(5) or die "timeout!";
+        print "do something with shared lock\n";
     }
 
 =head1 DESCRIPTION

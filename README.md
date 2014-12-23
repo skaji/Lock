@@ -12,10 +12,14 @@ Lock - do something with file lock
         my $guard = $lock->shared;
         print "do something with shared lock\n";
     }
-
     {
         my $guard = $lock->exclusive;
         print "do something with exclusive lock\n";
+    }
+    {
+        # with timeout 5sec
+        my $guard = $lock->shared(5) or die "timeout!";
+        print "do something with shared lock\n";
     }
 
 # DESCRIPTION

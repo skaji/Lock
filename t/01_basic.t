@@ -105,6 +105,22 @@ subtest guard => sub {
     is $?, 0;
 };
 
-
+subtest timeout => sub {
+    my $tempfile = tempfile;
+    my $lock = Lock->new($tempfile);
+    my $guard = $lock->shared;
+    my $pid = fork;
+    die unless defined $pid;
+    if ($pid == 0) {
+        my $guard = $lock->exclusive(1);
+        if ($guard) {
+            exit 1;
+        } else {
+            exit 0;
+        }
+    }
+    waitpid $pid, 0;
+    is $?, 0;
+};
 
 done_testing;

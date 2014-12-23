@@ -42,12 +42,12 @@
       },
       "runtime" : {
          "requires" : {
+            "Sys::SigAction" : "0",
             "perl" : "5.008001"
          }
       },
       "test" : {
          "requires" : {
-            "Sys::SigAction" : "0",
             "Test::More" : "0.98"
          }
       }
