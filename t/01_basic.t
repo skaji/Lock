@@ -85,4 +85,26 @@ subtest exclusive_exclusive => sub {
     is $?, 0;
 };
 
+subtest guard => sub {
+    my $tempfile = tempfile;
+    my $lock = Lock->new($tempfile);
+    {
+        my $guard = $lock->exclusive;
+    }
+    my $pid = fork;
+    die unless defined $pid;
+    if ($pid == 0) {
+        my $timeout = timeout_call 0.1, sub { $lock->exclusive };
+        if ($timeout) {
+            exit 1;
+        } else {
+            exit 0;
+        }
+    }
+    waitpid $pid, 0;
+    is $?, 0;
+};
+
+
+
 done_testing;
