@@ -21,6 +21,11 @@ Lock - do something with file lock
         my $guard = $lock->shared(5) or die "timeout!";
         print "do something with shared lock\n";
     }
+    {
+        # with timeout 0sec, i.e. non blocking
+        my $guard = $lock->shared(0) or last;
+        print "do something with shared lock\n";
+    }
 
 # DESCRIPTION
 

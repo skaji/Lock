@@ -5,6 +5,7 @@ use warnings;
 use Fcntl qw(:flock);
 use Carp 'croak';
 use Sys::SigAction qw(timeout_call);
+use Errno ();
 
 our $VERSION = "0.01";
 
@@ -33,20 +34,26 @@ sub _lock {
     my ($self, $kind, $timeout_second) = @_;
     $self->_reopen if $self->{pid} != $$;
     my $fh = $self->{fh};
-    my $is_timeout;
+
     if ($timeout_second) {
-        $is_timeout = timeout_call $timeout_second, sub {
+        my $is_timeout = timeout_call $timeout_second, sub {
             flock $fh, $kind or croak "flock $self->{file}: $!";
         };
+        return if $is_timeout;
+    } elsif (defined $timeout_second) {
+        my $ok = flock $fh, $kind | LOCK_NB;
+        if (!$ok) {
+            if ($! == Errno::EWOULDBLOCK) {
+                return;
+            } else {
+                croak "flock $self->{file}: $!";
+            }
+        }
     } else {
         flock $fh, $kind or croak "flock $self->{file}: $!";
     }
 
-    if ($timeout_second && $is_timeout) {
-        return;
-    } else {
-        Lock::Guard->new(sub { flock $fh, LOCK_UN });
-    }
+    Lock::Guard->new(sub { flock $fh, LOCK_UN });
 }
 
 sub exclusive {
@@ -85,6 +92,11 @@ Lock - do something with file lock
     {
         # with timeout 5sec
         my $guard = $lock->shared(5) or die "timeout!";
+        print "do something with shared lock\n";
+    }
+    {
+        # with timeout 0sec, i.e. non blocking
+        my $guard = $lock->shared(0) or last;
         print "do something with shared lock\n";
     }
 
