@@ -17,17 +17,15 @@ sub new {
     my ($class, $file) = @_;
     my $self = bless { file => $file }, $class;
     $self->_reopen;
+    $self;
 }
 
 sub _reopen {
     my $self = shift;
-    if (my $fh = delete $self->{fh}) {
-        close $self->{fh};
-    }
+    delete $self->{fh}; # just delete, don't close!
     open my $fh, ">>", $self->{file} or croak "open $self->{file}: $!";
     $self->{fh} = $fh;
     $self->{pid} = $$;
-    $self;
 }
 
 sub _lock {
